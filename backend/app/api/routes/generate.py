@@ -8,8 +8,9 @@ router = APIRouter(prefix="", tags=["generate"])
 
 
 @router.post("/generate", response_model=GenerateResponse)
-def generate(_: GenerateRequest) -> GenerateResponse:
+def generate(request: GenerateRequest) -> GenerateResponse:
     """Stub endpoint; implementation will be added incrementally."""
+    _ = request
     return GenerateResponse(
         acceptance_criteria=[],
         agent_prompts={"system": "", "task": "", "persona": ""},
