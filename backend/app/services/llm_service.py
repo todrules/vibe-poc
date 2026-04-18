@@ -15,8 +15,9 @@ class LLMService:
             msg = "Invalid template name format."
             raise ValueError(msg)
 
-        template_path = (self.prompts_dir / f"{template_name}.txt").resolve()
-        if self.prompts_dir.resolve() not in template_path.parents:
+        prompts_dir = self.prompts_dir.resolve()
+        template_path = (prompts_dir / f"{template_name}.txt").resolve()
+        if not template_path.is_relative_to(prompts_dir):
             msg = "Template path is outside prompts directory."
             raise ValueError(msg)
 

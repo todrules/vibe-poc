@@ -1,3 +1,4 @@
+import React from 'react';
 import RequirementInput from './components/RequirementInput';
 import OutputSection from './components/OutputSection';
 
