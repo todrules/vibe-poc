@@ -1,0 +1,3 @@
+# Task Prompt Template
+
+Given requirement text, generate acceptance criteria, agent prompts, user stories, and test cases.
