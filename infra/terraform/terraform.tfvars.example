@@ -1,0 +1,13 @@
+aws_region = "us-east-1"
+project_name = "vibe-poc"
+
+# Required backend runtime settings
+optnai_base_url = "https://your-optnai-endpoint.example.com/v1"
+optnai_api_key  = "replace-me"
+optnai_model    = "gpt-4o-mini"
+
+# Optional overrides
+backend_image_tag  = "latest"
+frontend_image_tag = "latest"
+backend_desired_count  = 1
+frontend_desired_count = 1

@@ -1,26 +1,56 @@
 """Pydantic schemas for /generate endpoint contracts."""
 
-from typing import List
-
-from pydantic import BaseModel, Field
-
-
-class AgentPrompts(BaseModel):
-    system: str = Field(default="")
-    task: str = Field(default="")
-    persona: str = Field(default="")
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 
-class GenerateRequest(BaseModel):
-    """Request accepts normalized requirement text."""
+class _CamelModel(BaseModel):
+    """Base model that serialises field names as camelCase JSON keys."""
 
-    requirement_text: str = Field(min_length=1)
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 
-class GenerateResponse(BaseModel):
-    """Strict response contract returned by LLM pipeline."""
+class AcceptanceCriteriaItem(_CamelModel):
+    """A single acceptance criterion expressed as a title and Gherkin scenario."""
 
-    acceptance_criteria: List[str]
-    agent_prompts: AgentPrompts
-    user_stories: List[str]
-    test_cases: List[str]
+    title: str = Field(description="Short descriptive title for the criterion.")
+    gherkin: str = Field(
+        description="Full Gherkin scenario (Given/When/Then) for the criterion."
+    )
+
+
+class AgentPrompts(_CamelModel):
+    """Prompt fragments returned for use in downstream AI agents."""
+
+    system: str = Field(default="", description="System-level instructions.")
+    task: str = Field(default="", description="Task description for the agent.")
+    persona: str = Field(default="", description="Persona framing for the agent.")
+
+
+class GenerateRequest(_CamelModel):
+    """Request payload accepted by POST /generate."""
+
+    requirements: str = Field(
+        min_length=1,
+        description="Free-form requirement text entered by the user.",
+    )
+    file_text: str | None = Field(
+        default=None,
+        description="Optional supplementary text extracted from an uploaded file.",
+    )
+
+
+class GenerateResponse(_CamelModel):
+    """Structured artifacts returned after processing the requirements."""
+
+    acceptance_criteria: list[AcceptanceCriteriaItem] = Field(
+        description="Gherkin-formatted acceptance criteria."
+    )
+    agent_prompts: AgentPrompts = Field(
+        description="System, task, and persona prompts for AI agents."
+    )
+    user_stories: list[str] = Field(description="User stories in standard format.")
+    test_cases: list[str] = Field(description="High-level test case descriptions.")
