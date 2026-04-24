@@ -3,15 +3,22 @@ import type {
   GenerateResponsePayload,
 } from "@/types/generation";
 
-const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
-
 function getApiBaseUrl(): string {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-  if (!baseUrl) {
-    return DEFAULT_API_BASE_URL;
+  if (baseUrl) {
+    return baseUrl.replace(/\/$/, "");
   }
 
-  return baseUrl.replace(/\/$/, "");
+  // In production, route through the same origin (ALB listener rules route /generate to backend).
+  // For local development, keep the previous localhost backend default.
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return "http://127.0.0.1:8000";
+    }
+  }
+
+  return "";
 }
 
 export async function generateArtifacts(
