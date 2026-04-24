@@ -1,15 +1,13 @@
 name: Deploy
 
 on:
-  push:
+  workflow_run:
+    workflows:
+      - Build
+    types:
+      - completed
     branches:
       - main
-    paths:
-      - backend/**
-      - frontend/**
-      - prompts/**
-      - infra/terraform/**
-      - .github/workflows/deploy.yml
   workflow_dispatch:
 
 permissions:
@@ -29,6 +27,7 @@ jobs:
     name: Terraform apply and ECS rollout
     runs-on: ubuntu-latest
     environment: production
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     defaults:
       run:
@@ -45,6 +44,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
