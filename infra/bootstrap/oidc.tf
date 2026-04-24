@@ -154,6 +154,23 @@ data "aws_iam_policy_document" "terraform_deployment" {
       values   = ["elasticloadbalancing.amazonaws.com"]
     }
   }
+
+  statement {
+    sid    = "IAMCreateServiceLinkedRoleForECS"
+    effect = "Allow"
+
+    actions = [
+      "iam:CreateServiceLinkedRole",
+    ]
+
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "iam:AWSServiceName"
+      values   = ["ecs.amazonaws.com"]
+    }
+  }
 }
 
 # Attach state bucket policy
