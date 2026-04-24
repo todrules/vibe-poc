@@ -104,11 +104,15 @@ data "aws_iam_policy_document" "terraform_deployment" {
       "ec2:CreateSecurityGroup",
       "ec2:DeleteSecurityGroup",
       "ec2:DescribeSecurityGroups",
+      "ec2:DescribeSecurityGroupRules",
       "ec2:AuthorizeSecurityGroupIngress",
       "ec2:RevokeSecurityGroupIngress",
       "ec2:AuthorizeSecurityGroupEgress",
       "ec2:RevokeSecurityGroupEgress",
       "ec2:ModifySecurityGroupRules",
+      "ec2:CreateTags",
+      "ec2:DeleteTags",
+      "ec2:DescribeTags",
     ]
 
     resources = ["*"]
