@@ -75,136 +75,45 @@ data "aws_iam_policy_document" "terraform_state_access" {
 
 # Policy for main deployment infrastructure (VPC, ALB, ECS, ECR, CloudWatch, IAM)
 data "aws_iam_policy_document" "terraform_deployment" {
+  # Full access to the services Terraform manages for this stack.
+  # Using service-level wildcards avoids repeated permission failures as the
+  # Terraform AWS provider adds new API calls (e.g. ListTagsForResource variants).
   statement {
-    sid    = "VPCManagement"
+    sid    = "EC2FullAccess"
     effect = "Allow"
-
-    actions = [
-      "ec2:CreateVpc",
-      "ec2:DeleteVpc",
-      "ec2:DescribeVpcs",
-      "ec2:ModifyVpcAttribute",
-      "ec2:CreateInternetGateway",
-      "ec2:DeleteInternetGateway",
-      "ec2:AttachInternetGateway",
-      "ec2:DetachInternetGateway",
-      "ec2:DescribeInternetGateways",
-      "ec2:CreateSubnet",
-      "ec2:DeleteSubnet",
-      "ec2:DescribeSubnets",
-      "ec2:ModifySubnetAttribute",
-      "ec2:DescribeAvailabilityZones",
-      "ec2:CreateRouteTable",
-      "ec2:DeleteRouteTable",
-      "ec2:DescribeRouteTables",
-      "ec2:CreateRoute",
-      "ec2:DeleteRoute",
-      "ec2:AssociateRouteTable",
-      "ec2:DisassociateRouteTable",
-      "ec2:CreateSecurityGroup",
-      "ec2:DeleteSecurityGroup",
-      "ec2:DescribeSecurityGroups",
-      "ec2:AuthorizeSecurityGroupIngress",
-      "ec2:RevokeSecurityGroupIngress",
-      "ec2:AuthorizeSecurityGroupEgress",
-      "ec2:RevokeSecurityGroupEgress",
-      "ec2:ModifySecurityGroupRules",
-    ]
-
+    actions   = ["ec2:*"]
     resources = ["*"]
   }
 
   statement {
-    sid    = "ALBManagement"
+    sid    = "ELBFullAccess"
     effect = "Allow"
-
-    actions = [
-      "elasticloadbalancing:CreateLoadBalancer",
-      "elasticloadbalancing:DeleteLoadBalancer",
-      "elasticloadbalancing:DescribeLoadBalancers",
-      "elasticloadbalancing:ModifyLoadBalancerAttributes",
-      "elasticloadbalancing:CreateTargetGroup",
-      "elasticloadbalancing:DeleteTargetGroup",
-      "elasticloadbalancing:DescribeTargetGroups",
-      "elasticloadbalancing:ModifyTargetGroupAttributes",
-      "elasticloadbalancing:CreateListener",
-      "elasticloadbalancing:DeleteListener",
-      "elasticloadbalancing:DescribeListeners",
-      "elasticloadbalancing:CreateRule",
-      "elasticloadbalancing:DeleteRule",
-      "elasticloadbalancing:DescribeRules",
-      "elasticloadbalancing:ModifyRule",
-      "elasticloadbalancing:RegisterTargets",
-      "elasticloadbalancing:DeregisterTargets",
-      "elasticloadbalancing:DescribeTargetHealth",
-    ]
-
+    actions   = ["elasticloadbalancing:*"]
     resources = ["*"]
   }
 
   statement {
-    sid    = "ECRRepositoryManagement"
+    sid    = "ECRFullAccess"
     effect = "Allow"
-
-    actions = [
-      "ecr:CreateRepository",
-      "ecr:DeleteRepository",
-      "ecr:DescribeRepositories",
-      "ecr:PutImageScanningConfiguration",
-      "ecr:BatchGetImage",
-      "ecr:GetDownloadUrlForLayer",
-      "ecr:PutImage",
-      "ecr:InitiateLayerUpload",
-      "ecr:UploadLayerPart",
-      "ecr:CompleteLayerUpload",
-    ]
-
+    actions   = ["ecr:*"]
     resources = ["*"]
   }
 
   statement {
-    sid    = "ECSManagement"
+    sid    = "ECSFullAccess"
     effect = "Allow"
-
-    actions = [
-      "ecs:CreateCluster",
-      "ecs:DeleteCluster",
-      "ecs:DescribeClusters",
-      "ecs:CreateTaskDefinition",
-      "ecs:DeleteTaskDefinition",
-      "ecs:DescribeTaskDefinition",
-      "ecs:RegisterTaskDefinition",
-      "ecs:CreateService",
-      "ecs:DeleteService",
-      "ecs:DescribeServices",
-      "ecs:UpdateService",
-      "ecs:ListTaskDefinitions",
-      "ecs:DescribeTaskDefinition",
-      "ecs:ListTasks",
-      "ecs:DescribeTasks",
-      "ecs:UpdateTaskSet",
-    ]
-
+    actions   = ["ecs:*"]
     resources = ["*"]
   }
 
   statement {
-    sid    = "CloudWatchLogs"
+    sid    = "CloudWatchLogsFullAccess"
     effect = "Allow"
-
-    actions = [
-      "logs:CreateLogGroup",
-      "logs:DeleteLogGroup",
-      "logs:DescribeLogGroups",
-      "logs:ListTagsLogGroup",
-      "logs:PutRetentionPolicy",
-      "logs:TagLogGroup",
-      "logs:UntagLogGroup",
-    ]
-
+    actions   = ["logs:*"]
     resources = ["*"]
   }
 
+  # IAM is kept explicit to prevent unintended privilege escalation.
   statement {
     sid    = "IAMRoleManagement"
     effect = "Allow"
@@ -220,6 +129,9 @@ data "aws_iam_policy_document" "terraform_deployment" {
       "iam:DetachRolePolicy",
       "iam:ListRolePolicies",
       "iam:ListAttachedRolePolicies",
+      "iam:TagRole",
+      "iam:UntagRole",
+      "iam:ListRoleTags",
       "iam:PassRole",
     ]
 
@@ -227,19 +139,36 @@ data "aws_iam_policy_document" "terraform_deployment" {
   }
 
   statement {
-    sid    = "PassRoleForECS"
+    sid    = "IAMCreateServiceLinkedRoleForELB"
     effect = "Allow"
 
     actions = [
-      "iam:PassRole"
+      "iam:CreateServiceLinkedRole",
     ]
 
     resources = ["*"]
 
     condition {
       test     = "StringEquals"
-      variable = "iam:PassedToService"
-      values   = ["ecs-tasks.amazonaws.com"]
+      variable = "iam:AWSServiceName"
+      values   = ["elasticloadbalancing.amazonaws.com"]
+    }
+  }
+
+  statement {
+    sid    = "IAMCreateServiceLinkedRoleForECS"
+    effect = "Allow"
+
+    actions = [
+      "iam:CreateServiceLinkedRole",
+    ]
+
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "iam:AWSServiceName"
+      values   = ["ecs.amazonaws.com"]
     }
   }
 }
