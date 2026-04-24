@@ -197,9 +197,12 @@ data "aws_iam_policy_document" "terraform_deployment" {
       "logs:DeleteLogGroup",
       "logs:DescribeLogGroups",
       "logs:ListTagsLogGroup",
+      "logs:ListTagsForResource",
       "logs:PutRetentionPolicy",
       "logs:TagLogGroup",
+      "logs:TagResource",
       "logs:UntagLogGroup",
+      "logs:UntagResource",
     ]
 
     resources = ["*"]
