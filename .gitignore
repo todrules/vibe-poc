@@ -11,6 +11,19 @@ dist/
 .next/
 frontend/.next/
 
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.tfplan
+crash.log
+crash.*.log
+.terraformrc
+terraform.rc
+
 # Environment
 .env
 .DS_Store

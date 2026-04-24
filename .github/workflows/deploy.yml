@@ -1,0 +1,129 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - backend/**
+      - frontend/**
+      - prompts/**
+      - infra/terraform/**
+      - .github/workflows/deploy.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  TF_WORKING_DIR: infra/terraform
+
+jobs:
+  deploy:
+    name: Terraform apply and ECS rollout
+    runs-on: ubuntu-latest
+    environment: production
+
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      TF_IN_AUTOMATION: true
+      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+      TF_VAR_project_name: ${{ vars.TF_PROJECT_NAME != '' && vars.TF_PROJECT_NAME || 'vibe-poc' }}
+      TF_VAR_optnai_base_url: ${{ vars.OPTNAI_BASE_URL }}
+      TF_VAR_optnai_model: ${{ vars.OPTNAI_MODEL }}
+      TF_VAR_optnai_api_key: ${{ secrets.OPTNAI_API_KEY }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Create CI backend override
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          cat <<'EOF' > ci_backend_override.tf
+          terraform {
+            backend "s3" {}
+          }
+          EOF
+
+      - name: Check Terraform formatting
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform fmt -check
+
+      - name: Initialize Terraform
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          terraform init \
+            -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=${{ vars.TF_STATE_KEY }}" \
+            -backend-config="region=${{ vars.TF_STATE_REGION }}"
+
+      - name: Apply infrastructure baseline
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform apply -input=false -auto-approve
+
+      - name: Capture Terraform outputs
+        id: tf_outputs
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          echo "backend_repo=$(terraform output -raw backend_repository_url)" >> "$GITHUB_OUTPUT"
+          echo "frontend_repo=$(terraform output -raw frontend_repository_url)" >> "$GITHUB_OUTPUT"
+
+      - name: Set image tag
+        id: image
+        run: echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: true
+          tags: ${{ steps.tf_outputs.outputs.backend_repo }}:${{ steps.image.outputs.tag }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          push: true
+          tags: ${{ steps.tf_outputs.outputs.frontend_repo }}:${{ steps.image.outputs.tag }}
+
+      - name: Apply image tag update
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          terraform apply \
+            -input=false \
+            -auto-approve \
+            -var="backend_image_tag=${{ steps.image.outputs.tag }}" \
+            -var="frontend_image_tag=${{ steps.image.outputs.tag }}"
+
+      - name: Remove CI backend override
+        if: always()
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: rm -f ci_backend_override.tf
